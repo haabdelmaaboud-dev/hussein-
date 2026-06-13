@@ -345,4 +345,69 @@ const MODALS = {
       if (btn) { btn.disabled = false; btn.textContent = 'Update Status'; }
     }
   }
+  openEditContacts(id) {
+    const r = STATE.db.stores.find(x => String(x.id) === String(id));
+    if (!r) { UI.toast('Store not found', 'err'); return; }
+    STATE.editId = id;
+    UI.openModal(`Contacts — ${r.branch}`,
+      `<div class="store-info-block">
+        <div class="sib-name">${r.branch}</div>
+        <div class="sib-meta">${r.area||'—'} · ${r.eng||'—'}</div>
+      </div>
+      <div class="section-div"><i class="ti ti-user-circle"></i> Branch Manager</div>
+      <div class="form-grid">
+        ${UI.formGroup('Name',  UI.formInput('ec-bmName',  'text', 'Branch Manager name',  r.branchManagerName  || ''))}
+        ${UI.formGroup('Phone', UI.formInput('ec-bmPhone', 'tel',  'e.g. 966501234567',    r.branchManagerPhone || ''))}
+      </div>
+      <div class="section-div"><i class="ti ti-user-check"></i> Supervisor</div>
+      <div class="form-grid">
+        ${UI.formGroup('Name',  UI.formInput('ec-supName',  'text', 'Supervisor name',   r.supervisorName  || ''))}
+        ${UI.formGroup('Phone', UI.formInput('ec-supPhone', 'tel',  'e.g. 966501234567', r.supervisorPhone || ''))}
+      </div>
+      <div class="section-div"><i class="ti ti-user-star"></i> Area Manager</div>
+      <div class="form-grid">
+        ${UI.formGroup('Name',  UI.formInput('ec-amName',  'text', 'Area Manager name',  r.areaManagerName  || ''))}
+        ${UI.formGroup('Phone', UI.formInput('ec-amPhone', 'tel',  'e.g. 966501234567',  r.areaManagerPhone || ''))}
+      </div>`,
+      `<button class="btn btn-secondary" onclick="UI.closeModal()">Cancel</button>
+       <button class="btn btn-brand" id="ecBtn" onclick="MODALS.saveEditContacts()">
+         <i class="ti ti-check"></i> Save Contacts
+       </button>`
+    );
+  },
+
+  async saveEditContacts() {
+    const r = STATE.db.stores.find(x => String(x.id) === String(STATE.editId));
+    if (!r) return;
+    const btn = document.getElementById('ecBtn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin .6s linear infinite"></i> Saving…'; }
+
+    const upd = {
+      id: r.id, branch: r.branch, eng: r.eng, ops: r.ops||'', area: r.area,
+      notes: r.notes||'', issueStatus: r.issueStatus||'',
+      DMB: r.DMB, Kitchen: r.Kitchen, POS: r.POS, Kiosk: r.Kiosk, Tablet: r.Tablet,
+      branchManagerName:  document.getElementById('ec-bmName')?.value.trim()  || '',
+      branchManagerPhone: document.getElementById('ec-bmPhone')?.value.trim() || '',
+      supervisorName:     document.getElementById('ec-supName')?.value.trim()  || '',
+      supervisorPhone:    document.getElementById('ec-supPhone')?.value.trim() || '',
+      areaManagerName:    document.getElementById('ec-amName')?.value.trim()  || '',
+      areaManagerPhone:   document.getElementById('ec-amPhone')?.value.trim() || '',
+      extraContacts: r.extraContacts || '',
+    };
+
+    try {
+      await API.updateStore(upd);
+      Object.assign(r, upd);
+      UI.closeModal();
+      // Refresh contacts grid if we are on contacts tab
+      if (APP.currentTab === 'contacts') {
+        ContactsView.updateGrid();
+      }
+      UI.toast('Contacts saved', 'ok');
+    } catch(e) {
+      UI.toast('Save failed: ' + e.message, 'err');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-check"></i> Save Contacts'; }
+    }
+  }
+
 };
