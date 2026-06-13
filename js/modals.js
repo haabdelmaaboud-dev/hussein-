@@ -344,7 +344,8 @@ const MODALS = {
       UI.toast('Failed: ' + e.message, 'err');
       if (btn) { btn.disabled = false; btn.textContent = 'Update Status'; }
     }
-  }
+  },
+
   openEditContacts(id) {
     const r = STATE.db.stores.find(x => String(x.id) === String(id));
     if (!r) { UI.toast('Store not found', 'err'); return; }
