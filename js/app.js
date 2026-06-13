@@ -225,6 +225,7 @@ const APP = {
       case 'admin':      if (area) area.innerHTML = AdminView.render();     break;
       case 'profile':    if (area) area.innerHTML = ProfileView.render();   break;
       case 'password':   if (area) area.innerHTML = ProfileView.render();   break;
+      case 'contacts':   if (area) area.innerHTML = ContactsView.render(); break;
       case 'auditlog':   AuditView.render(); break;   // async, sets DOM itself
       case 'history':
         if (area) area.innerHTML = `
@@ -244,7 +245,7 @@ const APP = {
   canAccessTab(tabId) {
     if (!STATE.currentUser) return false;
     const item = NAV_ITEMS.find(n => n.id === tabId);
-    if (!item) return tabId === 'password'; // always allow password
+    if (!item) return tabId === 'password' || tabId === 'contacts'; // always allow these
     return item.roles.includes(STATE.currentUser.role);
   },
 
@@ -361,7 +362,6 @@ const APP = {
   },
 
   // ── Global search ──────────────────────────────────────
-  globalSearch(query) { this.handleGlobalSearch(query); },
   handleGlobalSearch(query) {
     const results = document.getElementById('searchResults');
     if (!query || query.length < 2) {
@@ -468,14 +468,13 @@ const APP = {
     STATE.startDay();
     const btn = document.getElementById('startDayBtn');
     if (btn) {
-      btn.innerHTML = '<i class="ti ti-check"></i> Day Started!';
+      btn.innerHTML = '<i class="ti ti-check"></i> Day Started';
       btn.disabled  = true;
-      btn.style.background = 'var(--success)';
+      btn.classList.add('btn-success');
     }
-    UI.toast('🚀 Day started! All stores reset to unchecked. Good luck!', 'ok', 4000);
+    UI.toast('Day started! Good luck with your rounds.', 'ok');
     API.logAction('DAY_START', STATE.currentUser?.name, 'Engineer started daily rounds').catch(() => {});
-    // Re-render stores tab to show all yellow
-    setTimeout(() => this.refreshTab(), 300);
+    this.refreshTab();
   },
 
   installPWA() {
