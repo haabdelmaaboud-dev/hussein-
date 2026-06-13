@@ -1,5 +1,5 @@
 /* Shawarmer IT Operations — Service Worker */
-const CACHE_NAME = 'shawarmer-it-v5.1';
+const CACHE_NAME = 'shawarmer-it-v5.2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -53,10 +53,10 @@ self.addEventListener('fetch', (event) => {
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
       return fetch(event.request).catch(() => {
-        // Return offline fallback for navigation
         if (event.request.mode === 'navigate') {
-          return caches.match('/index.html');
+          return caches.match('/index.html').then((res) => res || new Response('Offline', { status: 503 }));
         }
+        return new Response('', { status: 503 });
       });
     })
   );
