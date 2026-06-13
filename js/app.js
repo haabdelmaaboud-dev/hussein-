@@ -225,7 +225,7 @@ const APP = {
       case 'admin':      if (area) area.innerHTML = AdminView.render();     break;
       case 'profile':    if (area) area.innerHTML = ProfileView.render();   break;
       case 'password':   if (area) area.innerHTML = ProfileView.render();   break;
-      case 'contacts':   if (area) area.innerHTML = ContactsView.render(); break;
+      case 'contacts':   if (area) { area.innerHTML = ContactsView.render(); ContactsView.bindSearch(); } break;
       case 'auditlog':   AuditView.render(); break;   // async, sets DOM itself
       case 'history':
         if (area) area.innerHTML = `
