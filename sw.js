@@ -1,28 +1,29 @@
 /* Shawarmer IT Operations — Service Worker */
-const CACHE_NAME = 'shawarmer-it-v5.2';
+const CACHE_NAME = 'shawarmer-it-v5.3';
+const BASE = '/hussein-';
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/css/main.css',
-  '/js/config.js',
-  '/js/api.js',
-  '/js/state.js',
-  '/js/ui.js',
-  '/js/notifications.js',
-  '/js/communication.js',
-  '/js/views/dashboard.js',
-  '/js/views/stores.js',
-  '/js/views/critical.js',
-  '/js/views/reports.js',
-  '/js/views/engineers.js',
-  '/js/views/alerts.js',
-  '/js/views/admin.js',
-  '/js/views/auditlog.js',
-  '/js/views/history.js',
-  '/js/views/profile.js',
-  '/js/modals.js',
-  '/js/app.js',
-  '/assets/favicon.svg'
+  BASE + '/',
+  BASE + '/index.html',
+  BASE + '/css/main.css',
+  BASE + '/js/config.js',
+  BASE + '/js/api.js',
+  BASE + '/js/state.js',
+  BASE + '/js/ui.js',
+  BASE + '/js/notifications.js',
+  BASE + '/js/communication.js',
+  BASE + '/js/views/dashboard.js',
+  BASE + '/js/views/stores.js',
+  BASE + '/js/views/critical.js',
+  BASE + '/js/views/reports.js',
+  BASE + '/js/views/engineers.js',
+  BASE + '/js/views/alerts.js',
+  BASE + '/js/views/admin.js',
+  BASE + '/js/views/auditlog.js',
+  BASE + '/js/views/history.js',
+  BASE + '/js/views/profile.js',
+  BASE + '/js/modals.js',
+  BASE + '/js/app.js',
+  BASE + '/assets/favicon.svg'
 ];
 
 self.addEventListener('install', (event) => {
@@ -54,7 +55,7 @@ self.addEventListener('fetch', (event) => {
       if (cached) return cached;
       return fetch(event.request).catch(() => {
         if (event.request.mode === 'navigate') {
-          return caches.match('/index.html').then((res) => res || new Response('Offline', { status: 503 }));
+          return caches.match(BASE + '/index.html').then((res) => res || new Response('Offline', { status: 503 }));
         }
         return new Response('', { status: 503 });
       });
