@@ -32,8 +32,7 @@ const API = {
 
   // ── Auth ────────────────────────────────────────────────
   async verifyLogin(username, password) {
-    const hashedPassword = hashPassword(password);
-    const url = `${APP_CONFIG.API_URL}?action=verifyLogin&username=${encodeURIComponent(username)}&password=${encodeURIComponent(hashedPassword)}&_=${Date.now()}`;
+    const url = `${APP_CONFIG.API_URL}?action=verifyLogin&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&_=${Date.now()}`;
     const res = await fetch(url);
     return res.json();
   },
