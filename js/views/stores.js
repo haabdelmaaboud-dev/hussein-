@@ -1,49 +1,47 @@
 /* =====================================================
-   views/stores.js
-   FIXES:
-   1. Engineer sees all stores YELLOW (unchecked) on open
-   2. Search works correctly
-   3. WhatsApp numbers preserved on quickToggle (bug fix)
-   4. Need Visit card click shows visit status modal
+   views/stores.js — Updated tabs: All, Today, Unchecked, Issues, Critical
+   Checked = lastCheckAt is today (from Sheets, not localStorage)
    ===================================================== */
 const StoresView = {
   filters: { view:'all', eng:'', area:'', device:'', q:'' },
 
+  // Check if store was checked today using lastCheckAt from Sheets
+  isCheckedToday(store) {
+    if (!store.lastCheckAt) return false;
+    const today = new Date().toISOString().slice(0, 10);
+    return String(store.lastCheckAt).slice(0, 10) === today;
+  },
+
   render() {
     const base  = STATE.myStores();
     const u     = STATE.currentUser;
-    const stats = STATE.dailyStats();
 
-    // For engineers: default view shows unchecked first (yellow)
-    // Search is applied on top
-    let filtered = STATE.applyFilters(base, StoresView.filters);
+    const todayCount     = base.filter(s => StoresView.isCheckedToday(s)).length;
+    const uncheckedCount = base.filter(s => !StoresView.isCheckedToday(s)).length;
 
-    // Sort: unchecked first (yellow), then checked
-    filtered = [...filtered].sort((a, b) => {
-      const aChecked = STATE.isCheckedToday(a.id) ? 1 : 0;
-      const bChecked = STATE.isCheckedToday(b.id) ? 1 : 0;
-      if (aChecked !== bChecked) return aChecked - bChecked; // unchecked first
-      return String(a.branch).localeCompare(String(b.branch));
-    });
+    let filtered = StoresView._applyFilters(base);
 
     const filterBar = `
       <div class="filter-bar">
         <div class="filter-tabs-row">
           <div class="filter-tabs">
-            ${['all','issues','ok','unchecked','critical'].map(v => `
-              <button class="filter-tab ${StoresView.filters.view===v?'active':''}"
-                onclick="StoresView.setFilter('view','${v}')">
-                ${v==='all'?'All':v==='issues'?'Issues':v==='ok'?'OK':v==='unchecked'?'Unchecked':'Critical'}
-                ${v==='unchecked' ? `<span class="tab-count-badge">${base.filter(s=>!STATE.isCheckedToday(s.id)).length}</span>` : ''}
+            ${[
+              { v:'all',       label:'All',       count: null },
+              { v:'today',     label:'Today',     count: todayCount },
+              { v:'unchecked', label:'Unchecked', count: uncheckedCount },
+              { v:'issues',    label:'Issues',    count: null },
+              { v:'critical',  label:'Critical',  count: null },
+            ].map(t => `
+              <button class="filter-tab ${StoresView.filters.view===t.v?'active':''}"
+                onclick="StoresView.setFilter('view','${t.v}')">
+                ${t.label}
+                ${t.count !== null ? `<span class="tab-count-badge">${t.count}</span>` : ''}
               </button>`).join('')}
           </div>
           <div class="filter-search-row">
             <div class="search-box-wrap">
               <i class="ti ti-search search-box-ico"></i>
-              <input
-                class="search-box-inp"
-                type="text"
-                id="storeSearchInput"
+              <input class="search-box-inp" type="text" id="storeSearchInput"
                 placeholder="Search store or number…"
                 value="${StoresView.filters.q}"
                 oninput="StoresView.liveSearch(this.value)"
@@ -68,27 +66,30 @@ const StoresView = {
         </div>
       </div>`;
 
+    const checked   = base.filter(s => StoresView.isCheckedToday(s)).length;
+    const remaining = base.length - checked;
+    const pct       = base.length ? Math.round(checked / base.length * 100) : 0;
+    const critical  = base.filter(s => STATE.healthLabel(s) === 'critical').length;
+
     const progressBar = `
       <div class="stores-progress-bar">
         <div class="spb-left">
           <div class="spb-counts">
-            <span class="spb-checked"><i class="ti ti-circle-check"></i> ${stats.checked} Checked</span>
-            <span class="spb-remaining"><i class="ti ti-clock"></i> ${stats.remaining} Remaining</span>
-            ${stats.critical > 0 ? `<span class="spb-critical"><i class="ti ti-alert-circle"></i> ${stats.critical} Critical</span>` : ''}
+            <span class="spb-checked"><i class="ti ti-circle-check"></i> ${checked} Checked</span>
+            <span class="spb-remaining"><i class="ti ti-clock"></i> ${remaining} Remaining</span>
+            ${critical > 0 ? `<span class="spb-critical"><i class="ti ti-alert-circle"></i> ${critical} Critical</span>` : ''}
           </div>
-          <div class="spb-track">
-            <div class="spb-fill" style="width:${stats.pct}%"></div>
-          </div>
+          <div class="spb-track"><div class="spb-fill" style="width:${pct}%"></div></div>
         </div>
         <div class="spb-right">
-          <span class="spb-pct">${stats.pct}%</span>
+          <span class="spb-pct">${pct}%</span>
           <span class="spb-label">Today</span>
         </div>
         <div class="spb-sync"><div class="sync-dot"></div> ${filtered.length} of ${base.length} stores</div>
       </div>`;
 
     const rows  = filtered.map(s => StoresView.storeCard(s)).join('');
-    const empty = `<div class="empty-state"><i class="ti ti-search-off"></i><p>No stores match your search</p></div>`;
+    const empty = `<div class="empty-state"><i class="ti ti-search-off"></i><p>No stores match</p></div>`;
 
     return `
       <div class="view-header">
@@ -100,24 +101,42 @@ const StoresView = {
       <div class="stores-list" id="storesList">${filtered.length ? rows : empty}</div>`;
   },
 
-  // ── Live search without full re-render (fix: search works) ──
+  _applyFilters(base) {
+    const f = StoresView.filters;
+    let result = base.filter(s => {
+      if (f.eng    && s.eng    !== f.eng)    return false;
+      if (f.area   && s.area   !== f.area)   return false;
+      if (f.device && s[f.device] === 1)     return false;
+      if (f.q) {
+        const q = f.q.toLowerCase();
+        if (!s.branch?.toLowerCase().includes(q) && !String(s.id).includes(q)) return false;
+      }
+      if (f.view === 'today')     return StoresView.isCheckedToday(s);
+      if (f.view === 'unchecked') return !StoresView.isCheckedToday(s);
+      if (f.view === 'issues')    return STATE.hasIssue(s);
+      if (f.view === 'critical')  return STATE.healthLabel(s) === 'critical';
+      return true;
+    });
+
+    // Sort: unchecked first, then by branch name
+    return result.sort((a, b) => {
+      const aC = StoresView.isCheckedToday(a) ? 1 : 0;
+      const bC = StoresView.isCheckedToday(b) ? 1 : 0;
+      if (aC !== bC) return aC - bC;
+      return String(a.branch).localeCompare(String(b.branch));
+    });
+  },
+
   liveSearch(q) {
     StoresView.filters.q = q;
-    const base     = STATE.myStores();
-    const filtered = STATE.applyFilters(base, StoresView.filters).sort((a,b) => {
-      const aC = STATE.isCheckedToday(a.id) ? 1 : 0;
-      const bC = STATE.isCheckedToday(b.id) ? 1 : 0;
-      return aC - bC;
-    });
     const list = document.getElementById('storesList');
+    const base = STATE.myStores();
+    const filtered = StoresView._applyFilters(base);
     if (list) {
       list.innerHTML = filtered.length
         ? filtered.map(s => StoresView.storeCard(s)).join('')
         : `<div class="empty-state"><i class="ti ti-search-off"></i><p>No stores match "<strong>${q}</strong>"</p></div>`;
     }
-    // Update clear button
-    const inp = document.getElementById('storeSearchInput');
-    if (inp) inp.value = q;
   },
 
   clearSearch() {
@@ -125,23 +144,27 @@ const StoresView = {
     StoresView.setFilter('q', '');
   },
 
-  // ── Store card — yellow if unchecked ────────────────────────
   storeCard(s) {
     const devs    = STATE.devList();
     const health  = STATE.healthLabel(s);
-    const checked = STATE.isCheckedToday(s.id);
+    const checked = StoresView.isCheckedToday(s);
     const pct     = STATE.pct(s);
     const canEdit = STATE.canEdit(s);
 
-    // Card state:
-    // - unchecked → yellow border (needs-check)
-    // - checked + healthy → green
-    // - checked + issues → red/orange
-    const cardClass = !checked
-      ? 'store-card needs-check'
-      : `store-card checked ${health}`;
+    // Show last check time if checked today, or last update date if not
+    let timeLabel = '';
+    if (checked && s.lastCheckAt) {
+      const t = new Date(s.lastCheckAt);
+      timeLabel = `<div class="store-card-status-tag checked-tag"><i class="ti ti-circle-check"></i> ${t.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>`;
+    } else if (s.lastCheckAt) {
+      const d = new Date(s.lastCheckAt);
+      timeLabel = `<div class="store-card-status-tag unchecked-tag"><i class="ti ti-clock"></i> Last: ${d.toLocaleDateString([],{day:'numeric',month:'short'})}</div>`;
+    } else {
+      timeLabel = `<div class="store-card-status-tag unchecked-tag"><i class="ti ti-clock"></i> Not checked yet</div>`;
+    }
 
-    const dotClass = !checked ? 'unchecked' : health;
+    const cardClass = !checked ? 'store-card needs-check' : `store-card checked ${health}`;
+    const dotClass  = !checked ? 'unchecked' : health;
 
     return `<div class="${cardClass}" id="store-card-${s.id}">
       <div class="store-card-left">
@@ -149,11 +172,10 @@ const StoresView = {
         <div class="store-card-info">
           <div class="store-card-name">${s.branch}</div>
           <div class="store-card-meta">${s.eng||'—'} · ${s.area||'—'}</div>
-          ${!checked ? `<div class="store-card-status-tag unchecked-tag"><i class="ti ti-clock"></i> Not checked yet</div>` : ''}
+          ${timeLabel}
           ${s.notes ? `<div class="store-card-note"><i class="ti ti-note"></i> ${String(s.notes).substring(0,50)}${s.notes.length>50?'…':''}</div>` : ''}
         </div>
       </div>
-
       <div class="store-card-devices">
         ${devs.map(d => `
           <div class="dev-quick-btn ${!checked ? 'unchecked-dev' : (s[d]?'ok':'issue')}"
@@ -163,7 +185,6 @@ const StoresView = {
             <span>${d}</span>
           </div>`).join('')}
       </div>
-
       <div class="store-card-right">
         ${checked
           ? `<span class="score-pill ${health==='healthy'?'sp-100':health==='warning'?'sp-80':'sp-low'}">${pct}%</span>`
@@ -175,7 +196,7 @@ const StoresView = {
           <button class="btn btn-sm btn-ghost" onclick="COMM.openStoreCommunication(${s.id})" title="WhatsApp">
             <i class="ti ti-brand-whatsapp"></i>
           </button>
-          <button class="btn btn-sm btn-ghost" onclick="HistoryView.renderForStore(${s.id},'${s.branch.replace(/'/g,"\\'")}')" title="History">
+          <button class="btn btn-sm btn-ghost" onclick="HistoryView.renderForStore(${s.id},'${s.branch.replace(/'/g,"\\'")}')">
             <i class="ti ti-history"></i>
           </button>
         </div>
@@ -187,14 +208,12 @@ const StoresView = {
     StoresView.filters[key] = val;
     const area = document.getElementById('contentArea');
     if (area) area.innerHTML = StoresView.render();
-    // Restore search focus
     if (key !== 'q') {
       const inp = document.getElementById('storeSearchInput');
       if (inp) inp.focus();
     }
   },
 
-  // ── Quick toggle — FIX: preserves ALL fields including phone numbers ──
   async quickToggle(storeId, device) {
     const store = STATE.db.stores.find(s => String(s.id) === String(storeId));
     if (!store || !STATE.canEdit(store)) return;
@@ -203,24 +222,14 @@ const StoresView = {
     const original = store[device];
     store[device]  = newVal;
 
-    // Optimistic: update just this card's device button
     StoresView._updateCardDevice(storeId, device, newVal);
 
     try {
-      // FIX: send ALL fields — never let undefined/empty overwrite phone numbers
       const payload = {
-        id:      store.id,
-        branch:  store.branch  || '',
-        eng:     store.eng     || '',
-        ops:     store.ops     || '',
-        area:    store.area    || '',
-        notes:   store.notes   || '',
-        DMB:     store.DMB     ? 1 : 0,
-        Kitchen: store.Kitchen ? 1 : 0,
-        POS:     store.POS     ? 1 : 0,
-        Kiosk:   store.Kiosk   ? 1 : 0,
-        Tablet:  store.Tablet  ? 1 : 0,
-        // ✅ ALWAYS preserve contact numbers
+        id: store.id, branch: store.branch||'', eng: store.eng||'',
+        ops: store.ops||'', area: store.area||'', notes: store.notes||'',
+        DMB: store.DMB?1:0, Kitchen: store.Kitchen?1:0, POS: store.POS?1:0,
+        Kiosk: store.Kiosk?1:0, Tablet: store.Tablet?1:0,
         branchManagerName:  store.branchManagerName  || '',
         branchManagerPhone: store.branchManagerPhone || '',
         supervisorName:     store.supervisorName     || '',
@@ -232,13 +241,13 @@ const StoresView = {
       };
 
       await API.updateStore(payload);
-      STATE.markChecked(storeId);
 
-      // After marking checked — update the whole card to show proper colors
+      // Update lastCheckAt locally so isCheckedToday works immediately
+      store.lastCheckAt = new Date().toISOString();
+      STATE.markChecked(storeId);
       StoresView._refreshCard(storeId);
 
-      const icon = newVal ? '✓' : '✗';
-      UI.toast(`${icon} ${device} — ${store.branch}`, newVal ? 'ok' : 'warn');
+      UI.toast(`${newVal?'✓':'✗'} ${device} — ${store.branch}`, newVal?'ok':'warn');
     } catch(e) {
       store[device] = original;
       StoresView._updateCardDevice(storeId, device, original);
@@ -246,7 +255,6 @@ const StoresView = {
     }
   },
 
-  // Update a single device button without full re-render
   _updateCardDevice(storeId, device, val) {
     const card = document.getElementById(`store-card-${storeId}`);
     if (!card) return;
@@ -259,7 +267,6 @@ const StoresView = {
     }
   },
 
-  // Refresh a full store card after checking
   _refreshCard(storeId) {
     const store = STATE.db.stores.find(s => String(s.id) === String(storeId));
     if (!store) return;
@@ -273,13 +280,8 @@ const StoresView = {
    Need Visit — modal with visit status
    ===================================================== */
 const NeedVisitView = {
-
-  // Called from dashboard KPI card click
   open() {
-    const stores = STATE.myStores().filter(s =>
-      s.issueStatus === 'open' && STATE.hasIssue(s)
-    );
-
+    const stores = STATE.myStores().filter(s => s.issueStatus === 'open' && STATE.hasIssue(s));
     if (!stores.length) {
       UI.openModal('Need Visit',
         `<div class="empty-state"><i class="ti ti-circle-check" style="color:var(--success)"></i>
@@ -288,35 +290,30 @@ const NeedVisitView = {
       );
       return;
     }
-
     const rows = stores.map(s => {
-      const visited  = s.visitStatus === 'visited';
-      const devs     = STATE.devList();
-      const broken   = devs.filter(d => !s[d]);
-      return `
-        <div class="visit-item ${visited ? 'visit-done' : ''}" id="vi-${s.id}">
-          <div class="visit-item-left">
-            <div class="visit-dot ${visited ? 'done' : 'pending'}"></div>
-            <div class="visit-info">
-              <div class="visit-name">${s.branch}</div>
-              <div class="visit-meta">${s.area} · ${s.eng}</div>
-              <div class="visit-devices">${broken.map(d => `<span class="dev-tag-bad">${d}</span>`).join('')}</div>
-              ${s.notes ? `<div class="visit-note">${s.notes}</div>` : ''}
-            </div>
+      const visited = s.visitStatus === 'visited';
+      const broken  = STATE.devList().filter(d => !s[d]);
+      return `<div class="visit-item ${visited?'visit-done':''}" id="vi-${s.id}">
+        <div class="visit-item-left">
+          <div class="visit-dot ${visited?'done':'pending'}"></div>
+          <div class="visit-info">
+            <div class="visit-name">${s.branch}</div>
+            <div class="visit-meta">${s.area} · ${s.eng}</div>
+            <div class="visit-devices">${broken.map(d=>`<span class="dev-tag-bad">${d}</span>`).join('')}</div>
+            ${s.notes?`<div class="visit-note">${s.notes}</div>`:''}
           </div>
-          <div class="visit-item-right">
-            ${visited
-              ? `<span class="visit-badge done"><i class="ti ti-circle-check"></i> Visited</span>
-                 <button class="btn btn-sm btn-ghost" onclick="NeedVisitView.markVisit(${s.id}, false)">Undo</button>`
-              : `<button class="btn btn-sm btn-brand" onclick="NeedVisitView.markVisit(${s.id}, true)">
-                   <i class="ti ti-map-pin"></i> Mark Visited
-                 </button>`}
-          </div>
-        </div>`;
+        </div>
+        <div class="visit-item-right">
+          ${visited
+            ? `<span class="visit-badge done"><i class="ti ti-circle-check"></i> Visited</span>
+               <button class="btn btn-sm btn-ghost" onclick="NeedVisitView.markVisit(${s.id},false)">Undo</button>`
+            : `<button class="btn btn-sm btn-brand" onclick="NeedVisitView.markVisit(${s.id},true)">
+                 <i class="ti ti-map-pin"></i> Mark Visited
+               </button>`}
+        </div>
+      </div>`;
     }).join('');
-
-    UI.openModal(
-      `📍 Need Visit (${stores.length})`,
+    UI.openModal(`📍 Need Visit (${stores.length})`,
       `<div class="visit-list">${rows}</div>`,
       `<button class="btn btn-secondary" onclick="UI.closeModal()">Close</button>
        <button class="btn btn-brand" onclick="COMM.openAreaSummary()">
@@ -328,14 +325,10 @@ const NeedVisitView = {
   async markVisit(storeId, visited) {
     const store = STATE.db.stores.find(s => String(s.id) === String(storeId));
     if (!store) return;
-
     store.visitStatus = visited ? 'visited' : 'pending';
-
     try {
       await API.updateStore({
-        ...store,
-        visitStatus: store.visitStatus,
-        // preserve all fields
+        ...store, visitStatus: store.visitStatus,
         branchManagerName:  store.branchManagerName  || '',
         branchManagerPhone: store.branchManagerPhone || '',
         supervisorName:     store.supervisorName     || '',
@@ -343,21 +336,18 @@ const NeedVisitView = {
         areaManagerName:    store.areaManagerName    || '',
         areaManagerPhone:   store.areaManagerPhone   || '',
       });
-
-      // Update just this item in the modal
       const item = document.getElementById(`vi-${storeId}`);
       if (item) {
         item.classList.toggle('visit-done', visited);
         item.querySelector('.visit-item-right').innerHTML = visited
           ? `<span class="visit-badge done"><i class="ti ti-circle-check"></i> Visited</span>
-             <button class="btn btn-sm btn-ghost" onclick="NeedVisitView.markVisit(${storeId}, false)">Undo</button>`
-          : `<button class="btn btn-sm btn-brand" onclick="NeedVisitView.markVisit(${storeId}, true)">
+             <button class="btn btn-sm btn-ghost" onclick="NeedVisitView.markVisit(${storeId},false)">Undo</button>`
+          : `<button class="btn btn-sm btn-brand" onclick="NeedVisitView.markVisit(${storeId},true)">
                <i class="ti ti-map-pin"></i> Mark Visited
              </button>`;
-        item.querySelector('.visit-dot').className = `visit-dot ${visited ? 'done' : 'pending'}`;
+        item.querySelector('.visit-dot').className = `visit-dot ${visited?'done':'pending'}`;
       }
-
-      UI.toast(visited ? `✓ Visit logged for ${store.branch}` : 'Visit unmarked', visited ? 'ok' : 'info');
+      UI.toast(visited?`✓ Visit logged for ${store.branch}`:'Visit unmarked', visited?'ok':'info');
     } catch(e) {
       store.visitStatus = visited ? 'pending' : 'visited';
       UI.toast('Failed: ' + e.message, 'err');
