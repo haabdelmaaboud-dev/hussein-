@@ -281,7 +281,7 @@ const StoresView = {
    ===================================================== */
 const NeedVisitView = {
   open() {
-    const stores = STATE.myStores().filter(s => s.issueStatus === 'open' && STATE.hasIssue(s));
+    const stores = STATE.myStores().filter(s => s.notes?.toLowerCase().includes('need visit') || (s.issueStatus === 'open' && STATE.hasIssue(s)));
     if (!stores.length) {
       UI.openModal('Need Visit',
         `<div class="empty-state"><i class="ti ti-circle-check" style="color:var(--success)"></i>
