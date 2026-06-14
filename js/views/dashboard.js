@@ -12,7 +12,7 @@ const DashboardView = {
 
   engineerView(stores, stats) {
     const critical   = stores.filter(s => STATE.healthLabel(s) === 'critical');
-    const needVisit  = stores.filter(s => s.notes?.toLowerCase().includes('need visit') || (s.issueStatus === 'open' && STATE.hasIssue(s)));
+    const needVisit  = stores.filter(s => (s.notes?.toLowerCase().includes('need visit') || (s.issueStatus === 'open' && STATE.hasIssue(s))) && s.visitStatus !== 'visited');
     const unchecked  = stores.filter(s => !StoresView.isCheckedToday(s));
 
     return `
@@ -123,7 +123,7 @@ const DashboardView = {
 
   managerView(stores, stats) {
     const critical   = stores.filter(s => STATE.healthLabel(s) === 'critical');
-    const needVisit  = stores.filter(s => s.notes?.toLowerCase().includes('need visit') || (s.issueStatus === 'open' && STATE.hasIssue(s)));
+    const needVisit  = stores.filter(s => (s.notes?.toLowerCase().includes('need visit') || (s.issueStatus === 'open' && STATE.hasIssue(s))) && s.visitStatus !== 'visited');
     const devs       = STATE.devList();
 
     const byEng = {};
