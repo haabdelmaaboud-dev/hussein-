@@ -2,7 +2,7 @@
    config.js v6.0 — Update API_URL after each deployment
    ===================================================== */
 const APP_CONFIG = {
-  API_URL:       'https://script.google.com/macros/s/AKfycbyOhXz0dCpiJlOzD9SrtGcgwW800qxMllhzbJ4zi6dcZ_blGNUcDkkeUyjFXNMCesU/exec',
+  API_URL:       'https://script.google.com/macros/s/AKfycbxX0S8yR8rERNTPKgRDIZ8zRqweQJowpBajjggwsVB58LiGgaVFSFCrrrWbaBz2SoNZ/exec',
   APP_NAME:      'Shawarmer IT Operations',
   VERSION:       '6.0',
   POLL_INTERVAL: 30000,
