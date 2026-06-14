@@ -12,8 +12,8 @@ const DashboardView = {
 
   engineerView(stores, stats) {
     const critical   = stores.filter(s => STATE.healthLabel(s) === 'critical');
-    const needVisit  = stores.filter(s => s.issueStatus === 'open' && STATE.hasIssue(s));
-    const unchecked  = stores.filter(s => !STATE.isCheckedToday(s.id));
+    const needVisit  = stores.filter(s => s.notes?.toLowerCase().includes('need visit') || (s.issueStatus === 'open' && STATE.hasIssue(s)));
+    const unchecked  = stores.filter(s => !StoresView.isCheckedToday(s));
 
     return `
       <div class="dash-greeting">
@@ -55,17 +55,20 @@ const DashboardView = {
 
       <!-- KPI cards — Need Visit is clickable -->
       <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
-        ${DashboardView.kpiCard({
+        ${DashboardView.kpiCardClickable({
           icon:'ti-building-store', cls:'kpi-burg',
-          label:'Total Stores', value:stats.total, sub:'Assigned to you'
+          label:'Total Stores', value:stats.total, sub:'Assigned to you',
+          onclick:"APP.showTab('stores')"
         })}
-        ${DashboardView.kpiCard({
+        ${DashboardView.kpiCardClickable({
           icon:'ti-circle-check', cls:'kpi-green',
-          label:'Checked Today', value:stats.checked, sub:`${stats.pct}% Completed`
+          label:'Checked Today', value:stats.checked, sub:`${stats.pct}% Completed`,
+          onclick:"APP.showTab('stores');setTimeout(()=>StoresView.setFilter('view','today'),100)"
         })}
-        ${DashboardView.kpiCard({
+        ${DashboardView.kpiCardClickable({
           icon:'ti-alert-circle', cls:'kpi-red',
-          label:'Critical', value:stats.critical, sub:'Require action'
+          label:'Critical', value:stats.critical, sub:'Require action',
+          onclick:"APP.showTab('critical')"
         })}
         ${DashboardView.kpiCardClickable({
           icon:'ti-flag', cls:'kpi-amber',
@@ -120,7 +123,7 @@ const DashboardView = {
 
   managerView(stores, stats) {
     const critical   = stores.filter(s => STATE.healthLabel(s) === 'critical');
-    const needVisit  = stores.filter(s => s.issueStatus === 'open' && STATE.hasIssue(s));
+    const needVisit  = stores.filter(s => s.notes?.toLowerCase().includes('need visit') || (s.issueStatus === 'open' && STATE.hasIssue(s)));
     const devs       = STATE.devList();
 
     const byEng = {};
@@ -150,9 +153,9 @@ const DashboardView = {
 
       <!-- KPI cards -->
       <div class="kpi-grid">
-        ${DashboardView.kpiCard({icon:'ti-building-store',cls:'kpi-burg',  label:'Total Stores',   value:stats.total,    sub:'Assigned to you'})}
-        ${DashboardView.kpiCard({icon:'ti-circle-check',  cls:'kpi-green', label:'Checked Today',  value:stats.checked,  sub:`${stats.pct}% Completed`})}
-        ${DashboardView.kpiCard({icon:'ti-alert-circle',  cls:'kpi-red',   label:'Critical Stores',value:stats.critical, sub:'Require immediate action'})}
+        ${DashboardView.kpiCardClickable({icon:'ti-building-store',cls:'kpi-burg', label:'Total Stores', value:stats.total, sub:'Assigned to you', onclick:"APP.showTab('stores')"})}
+        ${DashboardView.kpiCardClickable({icon:'ti-circle-check', cls:'kpi-green', label:'Checked Today',   value:stats.checked,  sub:`${stats.pct}% Completed`, onclick:"APP.showTab('stores');setTimeout(()=>StoresView.setFilter('view','today'),100)"})}
+        ${DashboardView.kpiCardClickable({icon:'ti-alert-circle',  cls:'kpi-red',   label:'Critical Stores', value:stats.critical, sub:'Require immediate action', onclick:"APP.showTab('critical')"})}
         ${DashboardView.kpiCardClickable({
           icon:'ti-flag', cls:'kpi-amber',
           label:'Need Visit', value:needVisit.length,
@@ -291,7 +294,7 @@ const DashboardView = {
   getInsight(stores) {
     const posIssues = stores.filter(s => !s.POS).length;
     if (posIssues > 3) return `<strong>${posIssues} stores</strong> have POS issues this week.`;
-    const unchecked = stores.filter(s => !STATE.isCheckedToday(s.id)).length;
+    const unchecked = stores.filter(s => !StoresView.isCheckedToday(s)).length;
     if (unchecked > 5) return `<strong>${unchecked} stores</strong> not checked today.`;
     return 'System performance is good. Keep it up!';
   }
