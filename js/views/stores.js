@@ -336,18 +336,9 @@ const NeedVisitView = {
         areaManagerName:    store.areaManagerName    || '',
         areaManagerPhone:   store.areaManagerPhone   || '',
       });
-      const item = document.getElementById(`vi-${storeId}`);
-      if (item) {
-        item.classList.toggle('visit-done', visited);
-        item.querySelector('.visit-item-right').innerHTML = visited
-          ? `<span class="visit-badge done"><i class="ti ti-circle-check"></i> Visited</span>
-             <button class="btn btn-sm btn-ghost" onclick="NeedVisitView.markVisit(${storeId},false)">Undo</button>`
-          : `<button class="btn btn-sm btn-brand" onclick="NeedVisitView.markVisit(${storeId},true)">
-               <i class="ti ti-map-pin"></i> Mark Visited
-             </button>`;
-        item.querySelector('.visit-dot').className = `visit-dot ${visited?'done':'pending'}`;
-      }
       UI.toast(visited?`✓ Visit logged for ${store.branch}`:'Visit unmarked', visited?'ok':'info');
+      // Re-open modal to reflect updated list
+      NeedVisitView.open();
     } catch(e) {
       store.visitStatus = visited ? 'pending' : 'visited';
       UI.toast('Failed: ' + e.message, 'err');
